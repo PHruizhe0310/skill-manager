@@ -1,0 +1,1955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>技能管家</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#fff; --line:#e3e6ea; --line2:#eef0f3;
+  --fg:#1c2024; --fg2:#5b6470; --fg3:#8b95a1;
+  --acc:#2f6fd0; --acc-bg:#eaf1fc;
+  --ok:#1f8a4c; --warn:#b26a00; --bad:#c0362c;
+  --tag:#5b4bb7; --tag-bg:#f0eefb;
+  --star:#d99b12;
+  --radius:10px;
+  --mono:"Cascadia Mono","Consolas","SFMono-Regular",monospace;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:14px/1.6 "Microsoft YaHei UI","Segoe UI",system-ui,-apple-system,sans-serif;
+  overflow:hidden;
+}
+button{font:inherit;cursor:pointer}
+a{color:var(--acc)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#cfd5dc;border-radius:6px;border:2px solid var(--bg)}
+::-webkit-scrollbar-thumb:hover{background:#b6bec8}
+
+/* ── 布局 ── */
+#app{display:flex;flex-direction:column;height:100vh}
+header{
+  display:flex;align-items:center;gap:12px;padding:10px 16px;
+  background:var(--panel);border-bottom:1px solid var(--line);flex:none;
+}
+.brand{font-weight:700;font-size:15px;letter-spacing:.3px;white-space:nowrap}
+.brand small{font-weight:400;color:var(--fg3);font-size:11px;margin-left:6px}
+#search{
+  flex:1;min-width:120px;max-width:520px;padding:7px 12px;
+  border:1px solid var(--line);border-radius:999px;background:var(--bg);
+  color:var(--fg);outline:none;font:inherit;
+}
+#search:focus{border-color:var(--acc);background:#fff;box-shadow:0 0 0 3px var(--acc-bg)}
+.btn{
+  padding:7px 13px;border:1px solid var(--line);border-radius:8px;
+  background:#fff;color:var(--fg);white-space:nowrap;
+}
+.btn:hover{border-color:var(--acc);color:var(--acc)}
+.btn.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{color:var(--bad);border-color:#f0cfcb}
+.btn.danger:hover{background:#fdf3f2;border-color:var(--bad)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn[disabled]:hover{border-color:var(--line);color:inherit}
+.spacer{flex:1}
+
+#main{display:flex;flex:1;min-height:0}
+
+/* ── 分类树 ── */
+#side{
+  width:250px;flex:none;background:var(--panel);border-right:1px solid var(--line);
+  overflow-y:auto;padding:10px 8px 24px;
+}
+.side-h{
+  font-size:11px;color:var(--fg3);letter-spacing:1px;
+  padding:6px 8px;text-transform:uppercase;
+}
+.node{
+  display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:7px;
+  cursor:pointer;user-select:none;
+}
+.node:hover{background:var(--line2)}
+.node.on{background:var(--acc-bg);color:var(--acc);font-weight:600}
+.node .dot{width:6px;height:6px;border-radius:50%;background:var(--fg3);flex:none}
+.node.on .dot{background:var(--acc)}
+.node .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node .ct{font-size:11px;color:var(--fg3);font-variant-numeric:tabular-nums}
+.node.on .ct{color:var(--acc)}
+.node.lv2{padding-left:24px}
+.node.lv2 .nm{font-size:13px;color:var(--fg2)}
+.node.lv2.on .nm{color:var(--acc)}
+.side-foot{padding:10px 8px 0;font-size:11px;color:var(--fg3);line-height:1.7}
+
+/* ── 主区 ── */
+#center{flex:1;display:flex;flex-direction:column;min-width:0}
+#bar{
+  display:flex;align-items:center;gap:8px;padding:9px 16px;
+  background:var(--panel);border-bottom:1px solid var(--line);flex:none;
+  font-size:13px;color:var(--fg2);
+}
+#bar b{color:var(--fg)}
+#bar .sel{
+  display:none;align-items:center;gap:8px;
+}
+#bar.has-sel{background:#fffdf5;border-bottom-color:#f0e4bd}
+#bar.has-sel .sel{display:flex}
+#bar .sel .n{font-weight:700;color:var(--warn)}
+.chk{cursor:pointer;user-select:none}
+
+/* ── 筛选栏 ── */
+#filters{
+  flex:none;background:var(--panel);border-bottom:1px solid var(--line);
+  padding:7px 16px;display:flex;flex-direction:column;gap:5px;
+}
+#filters.hide{display:none}
+.frow{display:flex;align-items:center;gap:8px;min-height:24px;flex-wrap:wrap}
+.flabel{
+  font-size:11px;color:var(--fg3);letter-spacing:1px;
+  width:34px;flex:none;text-transform:uppercase;
+}
+.chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center;flex:1;min-width:0}
+.chip{
+  background:var(--bg);border:1px solid var(--line);border-radius:999px;
+  padding:2px 9px;font-size:12px;color:var(--fg2);cursor:pointer;white-space:nowrap;
+}
+.chip:hover{border-color:var(--acc);color:var(--acc)}
+.chip.on{background:var(--acc-bg);border-color:var(--acc);color:var(--acc);font-weight:600}
+.chip .c{opacity:.6;margin-left:3px;font-size:11px}
+.chip.none,.none{color:var(--fg3);font-size:12px;cursor:default}
+.btn.tiny{padding:2px 9px;font-size:12px;border-radius:6px}
+.chk.mini{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--fg2)}
+.hint{font-size:11.5px;color:var(--fg3);flex:1;min-width:0;line-height:1.5}
+.hint b{color:var(--fg2)}
+mark{background:#fff3bf;color:inherit;border-radius:2px;padding:0 1px}
+.snippet{
+  font-size:11px;color:var(--fg3);line-height:1.5;margin-top:4px;
+  padding:4px 7px;background:#fffdf3;border-radius:5px;border:1px solid #f2e8c8;
+  word-break:break-word;
+}
+.card.dragging{opacity:.42;transform:scale(.97)}
+.node.drop{background:var(--acc-bg);outline:2px dashed var(--acc);outline-offset:-2px}
+.node.drop-bad{background:#fdf0ee;outline:2px dashed var(--bad);outline-offset:-2px}
+#grid.dragging-active .card{cursor:grabbing}
+
+/* ── 卡片墙 ── */
+#grid{
+  flex:1;overflow-y:auto;padding:16px;
+  display:grid;gap:14px;
+  grid-template-columns:repeat(auto-fill,minmax(268px,1fr));
+  align-content:start;
+}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:13px 14px;cursor:pointer;display:flex;flex-direction:column;gap:8px;
+  position:relative;transition:border-color .12s,box-shadow .12s;
+}
+.card:hover{border-color:var(--acc);box-shadow:0 3px 14px rgba(30,50,80,.09)}
+.card.on{border-color:var(--acc);background:#fbfdff}
+.card .top{display:flex;align-items:flex-start;gap:8px}
+.card .nm{font-weight:600;flex:1;word-break:break-word;line-height:1.4}
+.card .star{
+  flex:none;background:none;border:none;padding:0 2px;font-size:14px;
+  color:var(--fg3);line-height:1;
+}
+.card .star.on{color:var(--star)}
+.card .sum{
+  color:var(--fg2);font-size:12.5px;line-height:1.65;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;
+  overflow:hidden;min-height:2.6em;
+}
+.card .sum:empty::before{content:"（没有写介绍）";color:var(--fg3)}
+.card .tags{display:flex;flex-wrap:wrap;gap:4px}
+.card .foot{
+  display:flex;align-items:center;gap:8px;font-size:11px;color:var(--fg3);
+  border-top:1px solid var(--line2);padding-top:7px;margin-top:auto;
+}
+.tag{
+  background:var(--tag-bg);color:var(--tag);border-radius:5px;
+  padding:1px 6px;font-size:11px;
+}
+.cat-chip{color:var(--fg2)}
+/* 触屏设备没法用 HTML5 拖拽，卡片上给一个等价入口 */
+.movebtn{
+  border:1px solid var(--line2);background:transparent;color:var(--fg2);
+  border-radius:5px;padding:0 6px;font-size:11px;cursor:pointer;line-height:17px;
+}
+.movebtn:hover{border-color:var(--acc);color:var(--acc)}
+.empty{padding:60px 20px;text-align:center;color:var(--fg3)}
+
+/* ── 详情抽屉 ── */
+#mask{
+  position:fixed;inset:0;background:rgba(20,26,34,.34);
+  opacity:0;pointer-events:none;transition:opacity .16s;z-index:40;
+}
+#mask.on{opacity:1;pointer-events:auto}
+#drawer{
+  position:fixed;top:0;right:0;bottom:0;width:min(720px,94vw);
+  background:var(--panel);border-left:1px solid var(--line);
+  transform:translateX(100%);transition:transform .18s ease;
+  z-index:50;display:flex;flex-direction:column;
+  box-shadow:-8px 0 30px rgba(20,26,34,.13);
+}
+#drawer.on{transform:none}
+#dhead{padding:14px 18px;border-bottom:1px solid var(--line);flex:none}
+#dhead .r1{display:flex;align-items:center;gap:10px}
+#dhead h2{margin:0;font-size:17px;flex:1;word-break:break-word}
+#dclose{
+  background:none;border:none;font-size:22px;line-height:1;color:var(--fg3);
+  padding:0 4px;flex:none;
+}
+#dclose:hover{color:var(--fg)}
+#dhead .r2{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;align-items:center}
+#dbody{flex:1;overflow-y:auto;padding:16px 18px 40px}
+.sec{margin-bottom:20px}
+.sec>.lb{
+  font-size:11px;color:var(--fg3);letter-spacing:1px;margin-bottom:6px;
+  text-transform:uppercase;
+}
+.kv{display:grid;grid-template-columns:76px 1fr;gap:3px 10px;font-size:12.5px}
+.kv .k{color:var(--fg3)}
+.kv .v{color:var(--fg2);word-break:break-all}
+.path{font-family:var(--mono);font-size:11.5px}
+#dbody .btnrow{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px}
+
+/* 详情里的 Markdown 渲染样式 */
+.md{line-height:1.75;font-size:13.5px;word-wrap:break-word}
+.md>*:first-child{margin-top:0}
+.md h1,.md h2,.md h3,.md h4{margin:1.3em 0 .5em;line-height:1.35}
+.md h1{font-size:1.35em;border-bottom:1px solid var(--line);padding-bottom:5px}
+.md h2{font-size:1.2em;border-bottom:1px solid var(--line);padding-bottom:4px}
+.md h3{font-size:1.08em}
+.md h4,.md h5,.md h6{font-size:1em;color:var(--fg2)}
+.md p{margin:.6em 0}
+.md ul,.md ol{margin:.5em 0;padding-left:1.5em}
+.md li{margin:.25em 0}
+.md ul ul,.md ol ul,.md ul ol,.md ol ol{margin:.2em 0}
+.md code{
+  font-family:var(--mono);font-size:.9em;background:#f0f2f5;
+  padding:1px 5px;border-radius:4px;
+}
+.md pre{
+  background:#f7f8fa;border:1px solid var(--line);border-radius:8px;
+  padding:11px 13px;overflow-x:auto;margin:.7em 0;
+}
+.md pre code{background:none;padding:0;font-size:12px;line-height:1.6}
+.md blockquote{
+  margin:.7em 0;padding:6px 14px;border-left:3px solid var(--line);
+  color:var(--fg2);background:#fafbfc;
+}
+.md table{border-collapse:collapse;margin:.7em 0;font-size:12.5px;display:block;overflow-x:auto}
+.md th,.md td{border:1px solid var(--line);padding:5px 10px}
+.md th{background:#f5f7f9;font-weight:600}
+.md tr:nth-child(even) td{background:#fcfcfd}
+.md hr{border:none;border-top:1px solid var(--line);margin:1.3em 0}
+.md img{max-width:100%;border-radius:6px}
+.md-badlink{color:var(--fg3);text-decoration:line-through}
+.md del{color:var(--fg3)}
+
+/* ── 弹窗 ── */
+.modal{
+  position:fixed;inset:0;background:rgba(20,26,34,.4);z-index:60;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+.modal.on{display:flex}
+.sheet{
+  background:var(--panel);border-radius:12px;width:min(860px,100%);
+  max-height:88vh;display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 20px 60px rgba(20,26,34,.28);
+}
+.sheet h3{margin:0;padding:14px 18px;border-bottom:1px solid var(--line);font-size:15px}
+.sheet .bd{padding:16px 18px;overflow-y:auto;flex:1}
+.sheet .ft{
+  padding:12px 18px;border-top:1px solid var(--line);
+  display:flex;gap:8px;justify-content:flex-end;align-items:center;
+}
+.sheet .ft .msg{margin-right:auto;font-size:12.5px;color:var(--fg2)}
+label.fl{display:block;margin-bottom:12px;font-size:12.5px;color:var(--fg2)}
+label.fl>span{display:block;margin-bottom:4px;color:var(--fg3);font-size:11.5px}
+input[type=text],textarea,select{
+  width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:8px;
+  font:inherit;background:var(--bg);color:var(--fg);outline:none;
+}
+textarea{font-family:var(--mono);font-size:12.5px;line-height:1.65;resize:vertical}
+input:focus,textarea:focus,select:focus{border-color:var(--acc);background:#fff}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+/* 分发预览里的状态色 */
+.ok{color:var(--ok)} .warn{color:var(--warn)} .dim{color:var(--fg3)}
+.proj-row{
+  display:flex;align-items:flex-start;gap:12px;padding:9px 0;
+  border-bottom:1px solid var(--line2);
+}
+.proj-row .pr-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.proj-row .pr-main b{font-size:13.5px}
+.proj-row .pr-main small{color:var(--fg3);font-size:11.5px;word-break:break-all}
+.proj-row .pr-act{display:flex;gap:6px;flex-shrink:0}
+.issue{padding:5px 8px;border-left:3px solid var(--line2);margin-bottom:4px;font-size:12.5px}
+.issue.bad{border-left-color:var(--bad)}
+.issue.warn{border-left-color:var(--warn)}
+.issue.dim{border-left-color:var(--line2)}
+#tOut ul{margin:2px 0 10px;padding-left:20px;font-size:12.5px;color:var(--fg2)}
+#tOut p{margin:8px 0 3px;font-size:12.5px}
+.pick{
+  display:flex;align-items:flex-start;gap:9px;padding:8px 10px;
+  border:1px solid var(--line);border-radius:8px;margin-bottom:7px;cursor:pointer;
+}
+.pick:hover{border-color:var(--acc)}
+.pick .t{flex:1;min-width:0}
+.pick .t b{display:block;font-weight:600}
+.pick .t small{color:var(--fg3);font-size:11px;word-break:break-all}
+.hint{font-size:12px;color:var(--fg3);line-height:1.75;margin:6px 0}
+.err{color:var(--bad)}
+#toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(14px);
+  background:#242a31;color:#fff;padding:9px 18px;border-radius:999px;
+  font-size:13px;opacity:0;pointer-events:none;transition:.18s;z-index:90;
+  max-width:80vw;
+}
+#toast.on{opacity:1;transform:translateX(-50%)}
+#toast.bad{background:var(--bad)}
+.root-row{display:flex;align-items:center;gap:9px;padding:6px 0;border-bottom:1px solid var(--line2)}
+.root-row .p{flex:1;font-family:var(--mono);font-size:11.5px;word-break:break-all}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand">技能管家<small id="ver"></small></div>
+    <input id="search" type="text" placeholder="搜索名称、介绍、标签…" autocomplete="off">
+    <button class="btn primary" id="bCollect">+ 收录</button>
+    <button class="btn" id="bNew">+ 新建</button>
+    <button class="btn" id="bAi" title="让 AI 给未分类的 Skill 提分类建议">✨ AI 分类</button>
+    <div class="spacer"></div>
+    <button class="btn" id="bTools">备份</button>
+    <button class="btn" id="bProj">项目</button>
+    <button class="btn" id="bCat">分类管理</button>
+    <button class="btn" id="bSet">⚙ 设置</button>
+  </header>
+
+  <div id="main">
+    <nav id="side">
+      <div class="side-h">分类</div>
+      <div id="tree"></div>
+      <div class="side-foot">
+        拖卡片到这里可以改分类。<br>
+        点分类筛选，点卡片看详情。
+      </div>
+    </nav>
+
+    <section id="center">
+      <div id="bar">
+        <span id="bTitle">全部</span>
+        <span id="bCount"></span>
+        <div class="spacer"></div>
+        <div class="sel">
+          <span class="n"></span>
+          <span>已选</span>
+          <select id="bulkCat" style="width:auto;min-width:150px"></select>
+          <button class="btn" id="bBulkCat">改分类</button>
+          <button class="btn" id="bBulkTag">加标签</button>
+          <button class="btn" id="bBulkSend">复制到项目</button>
+          <button class="btn" id="bBulkStar">收藏</button>
+          <button class="btn danger" id="bBulkDel">删除</button>
+          <button class="btn" id="bSelClear">取消</button>
+        </div>
+      </div>
+      <div id="filters">
+        <div class="frow">
+          <span class="flabel">标签</span>
+          <div class="chips" id="fTags"><span class="none">（无）</span></div>
+        </div>
+        <div class="frow">
+          <span class="flabel">来源</span>
+          <div class="chips" id="fSrc"></div>
+          <span class="spacer"></span>
+          <label class="chk mini"><input type="checkbox" id="fUnused"><span>只看未使用</span></label>
+          <label class="chk mini"><input type="checkbox" id="fStar"><span>只看收藏</span></label>
+          <button class="btn tiny" id="fClear">清空筛选</button>
+        </div>
+        <div class="frow" id="bodyRow">
+          <span class="flabel">正文</span>
+          <span class="hint" id="bodyHint">搜索只看了名称/介绍/标签。</span>
+          <button class="btn tiny" id="bodyGo">在所有 SKILL.md 正文里找</button>
+        </div>
+      </div>
+      <div id="grid"></div>
+    </section>
+  </div>
+</div>
+
+<div id="mask"></div>
+<aside id="drawer">
+  <div id="dhead">
+    <div class="r1">
+      <h2 id="dTitle">…</h2>
+      <button id="dclose" title="关闭">×</button>
+    </div>
+    <div class="r2" id="dChips"></div>
+  </div>
+  <div id="dbody"></div>
+</aside>
+
+<div class="modal" id="mNew"><div class="sheet">
+  <h3>新建 Skill（粘贴文本）</h3>
+  <div class="bd">
+    <div class="row2">
+      <label class="fl"><span>名称 *</span><input id="nName" type="text" placeholder="例如：PPT 排版"></label>
+      <label class="fl"><span>归到哪个分类</span><select id="nCat"></select></label>
+    </div>
+    <label class="fl"><span>一句话介绍</span><input id="nSum" type="text" placeholder="留空就自动从正文提取"></label>
+    <label class="fl"><span>内容（Markdown）*</span><textarea id="nBody" rows="14" placeholder="# 标题&#10;## 什么时候用&#10;…"></textarea></label>
+    <div class="hint">会自动生成 <code>SKILL.md</code> 和 <code>skill.json</code>，放进你选的分类。</div>
+  </div>
+  <div class="ft"><span class="msg" id="nMsg"></span>
+    <button class="btn" data-close>取消</button><button class="btn primary" id="nOk">创建</button></div>
+</div></div>
+
+<div class="modal" id="mScan"><div class="sheet">
+  <h3>扫描本机已有 Skill</h3>
+  <div class="bd" id="sBody"></div>
+  <div class="ft"><span class="msg" id="sMsg"></span>
+    <button class="btn" data-close>取消</button><button class="btn primary" id="sOk">收录勾选的</button></div>
+</div></div>
+
+<div class="modal" id="mEdit"><div class="sheet">
+  <h3>编辑 Skill</h3>
+  <div class="bd">
+    <div class="row2">
+      <label class="fl"><span>名称</span><input id="eName" type="text"></label>
+      <label class="fl"><span>分类</span><select id="eCat"></select></label>
+    </div>
+    <label class="fl"><span>一句话介绍</span><textarea id="eSum" rows="3"></textarea></label>
+    <label class="fl"><span>标签（逗号分隔）</span><input id="eTags" type="text"></label>
+    <label class="fl chk" style="display:flex;align-items:center;gap:7px;margin:0">
+      <input id="eStar" type="checkbox"><span>收藏（列表里排最前）</span></label>
+  </div>
+  <div class="ft"><span class="msg" id="eMsg"></span>
+    <button class="btn" data-close>取消</button><button class="btn primary" id="eOk">保存</button></div>
+</div></div>
+
+<div class="modal" id="mTools"><div class="sheet wide">
+  <h3>备份与体检</h3>
+  <div class="bd">
+    <div class="btnrow">
+      <a class="btn" id="tBackup" href="/api/backup.zip" download>下载备份（zip）</a>
+      <button class="btn primary" id="tDoctor">体检</button>
+      <button class="btn" id="tFix" disabled>自动修复</button>
+      <button class="btn" id="tCheck">全库检查</button>
+    </div>
+    <div class="hint">备份里含全部 Skill 本体、清单、分类树、分发记录和回收站；
+      换台机器用 <code>skm import 那个.zip</code> 就能恢复。</div>
+    <div id="tOut"></div>
+    <div class="side-h" style="padding-left:0">回收站</div>
+    <div id="tTrash"></div>
+  </div>
+  <div class="ft"><span class="msg" id="tMsg"></span>
+    <button class="btn" data-close>关闭</button></div>
+</div></div>
+
+<div class="modal" id="mSend"><div class="sheet wide">
+  <h3>复制到项目</h3>
+  <div class="bd">
+    <div class="row3">
+      <label class="fl"><span>项目</span><select id="sdProj"></select></label>
+      <label class="fl"><span>方式</span><select id="sdMode">
+        <option value="copy">复制一份（默认，可提交进 Git）</option>
+        <option value="link">软链接（改库立刻生效）</option>
+      </select></label>
+      <label class="fl"><span>项目里已有同名旧版</span><select id="sdOver">
+        <option value="backup">备份后覆盖（默认）</option>
+        <option value="replace">直接覆盖</option>
+        <option value="skip">跳过</option>
+      </select></label>
+    </div>
+    <div class="hint" id="sdHint"></div>
+    <div id="sdList"></div>
+  </div>
+  <div class="ft"><span class="msg" id="sdMsg"></span>
+    <button class="btn" data-close>取消</button>
+    <button class="btn primary" id="sdOk">复制过去</button></div>
+</div></div>
+
+<div class="modal" id="mProj"><div class="sheet wide">
+  <h3>项目</h3>
+  <div class="bd">
+    <div class="row2">
+      <label class="fl"><span>项目名</span><input id="pjName" placeholder="例如：myapp"></label>
+      <label class="fl"><span>项目文件夹</span><input id="pjPath" placeholder="D:\\code\\myapp"></label>
+    </div>
+    <div class="btnrow"><button class="btn primary" id="pjAdd">登记</button></div>
+    <div id="pjList"></div>
+  </div>
+  <div class="ft"><span class="msg" id="pjMsg"></span>
+    <button class="btn" data-close>关闭</button></div>
+</div></div>
+
+<div class="modal" id="mMove"><div class="sheet">
+  <h3>移动到分类</h3>
+  <div class="bd">
+    <label class="fl"><span>目标分类</span><select id="mvCat"></select></label>
+    <div class="hint">手机上没法拖拽，用这个。<strong>已经勾选多个时</strong>会一起移动。</div>
+  </div>
+  <div class="ft"><span class="msg" id="mvMsg"></span>
+    <button class="btn" data-close>取消</button><button class="btn primary" id="mvOk">移动</button></div>
+</div></div>
+
+<div class="modal" id="mTag"><div class="sheet">
+  <h3>给选中的 Skill 加标签</h3>
+  <div class="bd">
+    <label class="fl"><span>标签（逗号分隔）</span><input id="tTags" type="text" placeholder="例如：ppt, 排版, 母版"></label>
+    <div class="hint">默认是<strong>追加</strong>，不会覆盖原有标签。</div>
+  </div>
+  <div class="ft"><span class="msg" id="tMsg"></span>
+    <button class="btn" data-close>取消</button><button class="btn primary" id="tOk">加上</button></div>
+</div></div>
+
+<div class="modal" id="mCat"><div class="sheet">
+  <h3>分类管理</h3>
+  <div class="bd">
+    <label class="fl"><span>新分类名称</span><input id="cName" type="text" placeholder="例如：应急响应"></label>
+    <label class="fl"><span>放在哪一级下面（留空 = 一级分类）</span><select id="cParent"></select></label>
+    <div class="hint">建完直接就能在左侧看到。删分类/改名字请直接编辑
+      <code>data/categories.json</code>，改完刷新页面即可。</div>
+    <div class="side-h" style="padding-left:0">当前分类树</div>
+    <div id="cTree"></div>
+  </div>
+  <div class="ft"><span class="msg" id="cMsg"></span><button class="btn primary" id="cOk">新建分类</button></div>
+</div></div>
+
+<div class="modal" id="mSet"><div class="sheet">
+  <h3>设置</h3>
+  <div class="bd">
+    <div class="side-h" style="padding-left:0">扫描位置</div>
+    <div id="cfgRoots"></div>
+    <label class="fl" style="margin-top:14px"><span>新增一个扫描位置</span>
+      <input id="sRoot" type="text" placeholder="例如 D:\share\skills"></label>
+    <div class="hint">以后 <code>skm scan</code> 和「+ 收录」都会扫这些位置。</div>
+
+    <div class="side-h" style="padding-left:0;margin-top:18px">AI 接口（一键自动分类用）</div>
+    <div class="row2">
+      <label class="fl"><span>接口地址（OpenAI 兼容）</span>
+        <input id="aiUrl" type="text" placeholder="https://api.openai.com/v1"></label>
+      <label class="fl"><span>模型</span>
+        <input id="aiModel" type="text" placeholder="gpt-4o-mini"></label>
+    </div>
+    <label class="fl"><span>API Key<span id="aiKeyState"></span></span>
+      <input id="aiKey" type="password" placeholder="留空表示不修改；也可以用环境变量 SKM_AI_API_KEY"></label>
+    <div class="row3">
+      <label class="fl"><span>正文节选字数</span>
+        <input id="aiChars" type="number" min="0" step="100"></label>
+      <label class="fl chk" style="display:flex;align-items:center;gap:7px;margin:14px 0 0">
+        <input type="checkbox" id="aiNew"><span>允许 AI 新建分类</span></label>
+      <div class="btnrow" style="justify-content:flex-end;margin-top:10px">
+        <button class="btn" id="aiTest">测试连接</button>
+      </div>
+    </div>
+    <div class="hint">Key 只存在本机 <code>data\config.json</code>（或环境变量），
+      不会下发到浏览器。接口需兼容 <code>/chat/completions</code>。</div>
+  </div>
+  <div class="ft"><span class="msg" id="cfgMsg"></span><button class="btn primary" id="cfgOk">保存</button></div>
+</div></div>
+
+<div class="modal" id="mAi"><div class="sheet wide">
+  <h3>AI 自动分类</h3>
+  <div class="bd">
+    <div class="btnrow">
+      <button class="btn" id="aiScopeUncat">只处理未分类</button>
+      <button class="btn" id="aiScopeAll">全部重新提建议</button>
+      <label class="chk mini"><input type="checkbox" id="aiLimitOn" checked><span>最多 20 个</span></label>
+      <span class="spacer"></span>
+      <span class="msg" id="aiMsg"></span>
+    </div>
+    <div class="hint">模型只给建议，**真正落盘前你可以逐条改**；标「新建」的会真的创建分类。</div>
+    <div id="aiOut"></div>
+  </div>
+  <div class="ft"><span class="msg" id="aiMsg2"></span>
+    <button class="btn" data-close>取消</button>
+    <button class="btn primary" id="aiApply" disabled>按建议归类</button></div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ──────────────────────────────────────────────────────────
+   状态
+   ────────────────────────────────────────────────────────── */
+var S = {
+  skills: [], cats: [], counts: {}, leaf: {},
+  filterCat: "", q: "", onlyStar: false, onlyUnused: false,
+  tags: [],            /* 按标签筛选：多个之间是「或」的关系 */
+  source: "",          /* 按来源筛选：scan / local / text / unknown */
+  bodyHits: null,      /* 正文搜索命中的 id；null = 还没搜过正文 */
+  bodySnippets: {},
+  bodyQuery: "",
+  sel: new Set(), detail: null, editing: null, cfg: null, dataDir: "",
+  dragging: null,      /* 正在拖拽的 Skill id 列表 */
+  moving: null,        /* 「移动到…」弹窗里待移动的 id 列表 */
+  sending: null, projects: null,  /* 分发相关 */
+  ai: null, aiItems: null          /* AI 自动分类 */
+};
+var OFFLINE = false;
+
+/* 离线导出页面把数据直接内嵌进来，不需要后端 */
+var BOOT = /*__SKM_BOOTSTRAP__*/null;
+if (BOOT && BOOT.state) {
+  OFFLINE = true;
+  S.skills = BOOT.state.skills;
+  S.cats = BOOT.state.categories;
+  S.counts = BOOT.state.counts;
+  S.leaf = BOOT.state.leafCounts;
+  S.dataDir = BOOT.state.dataDir;
+  boot();
+} else {
+  boot();
+}
+
+/* ──────────────────────────────────────────────────────────
+   工具
+   ────────────────────────────────────────────────────────── */
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+function bytes(n) {
+  if (!n) return "0 B";
+  var u = ["B", "KB", "MB", "GB"], i = 0;
+  while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+  return (i ? n.toFixed(1) : n) + " " + u[i];
+}
+var toastTimer = null;
+function toast(msg, bad) {
+  var el = $("toast");
+  el.textContent = msg;
+  el.className = "on" + (bad ? " bad" : "");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { el.className = ""; }, 2600);
+}
+function api(method, path, body) {
+  return fetch(path, {
+    method: method,
+    headers: body === undefined ? {} : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (d) {
+      if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+      return d;
+    });
+  });
+}
+function reload() {
+  if (OFFLINE) return Promise.resolve();
+  return api("GET", "/api/state").then(function (d) {
+    S.skills = d.skills; S.cats = d.categories;
+    S.counts = d.counts; S.leaf = d.leafCounts; S.dataDir = d.dataDir;
+    $("ver").textContent = "v" + d.version;
+    renderAll();
+  }).catch(function (e) { toast("读取技能库失败：" + e.message, true); });
+}
+function boot() {
+  if (!OFFLINE) $("ver").textContent = "v" + (S.dataDir ? "" : "");
+  renderAll();
+  reload().then(applyHash);
+}
+function skillById(id) {
+  for (var i = 0; i < S.skills.length; i++) if (S.skills[i].id === id) return S.skills[i];
+  return null;
+}
+function catOptions(withUncat) {
+  var out = ['<option value="">未分类</option>'];
+  S.cats.forEach(function (c) {
+    var n = esc(c.name);
+    out.push('<option value="' + n + '">' + n + '</option>');
+    (c.children || []).forEach(function (k) {
+      out.push('<option value="' + n + "/" + esc(k.name) + '">' + n + " / " + esc(k.name) + "</option>");
+    });
+  });
+  if (withUncat === false) out.shift();
+  return out.join("");
+}
+
+/* ──────────────────────────────────────────────────────────
+   渲染
+   ────────────────────────────────────────────────────────── */
+function filtered() {
+  var q = S.q.trim().toLowerCase();
+  var words = q ? q.split(/\s+/).filter(Boolean) : [];
+  return S.skills.filter(function (s) {
+    if (S.filterCat) {
+      if (s.category !== S.filterCat && s.category.indexOf(S.filterCat + "/") !== 0) return false;
+    }
+    if (S.onlyStar && !s.starred) return false;
+    if (S.onlyUnused && (s.usedBy || []).length) return false;
+    if (S.source && (s.sourceType || "-") !== S.source) return false;
+    /* 多个标签之间是「或」：命中任意一个就留着 */
+    if (S.tags.length) {
+      var mine = s.tags || [];
+      var hit = false;
+      for (var i = 0; i < S.tags.length; i++) {
+        if (mine.indexOf(S.tags[i]) >= 0) { hit = true; break; }
+      }
+      if (!hit) return false;
+    }
+    if (words.length) {
+      var hay = (s.id + " " + s.name + " " + s.summary + " " + (s.tags || []).join(" ")).toLowerCase();
+      /* 搜过正文的话，正文命中的也算（多个词要全中） */
+      var inBody = S.bodyHits && S.bodyHits.indexOf(s.id) >= 0;
+      var allInHead = true, anyInHead = false, allInBody = inBody;
+      for (var j = 0; j < words.length; j++) {
+        var inHead = hay.indexOf(words[j]) >= 0;
+        if (!inHead) { allInHead = false; } else { anyInHead = true; }
+        if (!inBody) { allInBody = false; }
+      }
+      if (!allInHead && !anyInHead && !allInBody) return false;
+    }
+    return true;
+  });
+}
+
+/* 把命中的搜索词高亮出来（在已转义的文本上做，避免引入 HTML） */
+function mark(text, words) {
+  var safe = esc(text);
+  if (!words || !words.length) return safe;
+  words.forEach(function (w) {
+    if (!w) return;
+    var pattern = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    safe = safe.replace(new RegExp("(" + pattern + ")", "gi"), "<mark>$1</mark>");
+  });
+  return safe;
+}
+
+function allTags() {
+  var map = {};
+  S.skills.forEach(function (s) {
+    (s.tags || []).forEach(function (t) { map[t] = (map[t] || 0) + 1; });
+  });
+  return Object.keys(map).sort(function (a, b) {
+    return map[b] - map[a] || a.localeCompare(b);
+  }).map(function (t) { return { tag: t, count: map[t] }; });
+}
+
+function renderFilters() {
+  /* 标签 chips */
+  var tags = allTags();
+  var box = $("fTags");
+  if (!tags.length) {
+    box.innerHTML = '<span class="none">（还没有标签）</span>';
+  } else {
+    box.innerHTML = tags.map(function (item) {
+      var on = S.tags.indexOf(item.tag) >= 0;
+      return '<span class="chip' + (on ? " on" : "") + '" data-tag="' + esc(item.tag) + '"' +
+        ' title="点击筛选（多个标签之间是「或」）">#' + esc(item.tag) +
+        '<span class="c">' + item.count + "</span></span>";
+    }).join("");
+  }
+  /* 来源 chips */
+  var srcMap = {};
+  S.skills.forEach(function (s) {
+    var key = s.sourceType || "unknown";
+    srcMap[key] = (srcMap[key] || 0) + 1;
+  });
+  var SRC_LABEL = { scan: "扫描收录", local: "手动添加", text: "粘贴新建", unknown: "来源未知" };
+  var srcs = Object.keys(srcMap).sort();
+  $("fSrc").innerHTML = ['<span class="chip' + (S.source ? "" : " on") +
+    '" data-src="">全部<span class="c">' + S.skills.length + "</span></span>"]
+    .concat(srcs.map(function (key) {
+      return '<span class="chip' + (S.source === key ? " on" : "") + '" data-src="' + esc(key) + '">' +
+        esc(SRC_LABEL[key] || key) + '<span class="c">' + srcMap[key] + "</span></span>";
+    })).join("");
+  $("fUnused").checked = S.onlyUnused;
+  $("fStar").checked = S.onlyStar;
+
+  /* 正文搜索状态 */
+  var hint = $("bodyHint"), btn = $("bodyGo");
+  if (OFFLINE) {
+    hint.textContent = "离线页面没有正文索引，不能搜正文。";
+    btn.disabled = true;
+  } else if (S.bodyHits) {
+    hint.innerHTML = "已在全部 SKILL.md 正文里找过 <b>" + esc(S.bodyQuery) +
+      "</b>，额外命中 <b>" + S.bodyHits.length + "</b> 个。";
+    btn.textContent = "重新找正文";
+  } else {
+    hint.textContent = S.q.trim() ? "搜索只看了名称/介绍/标签，正文还没搜。" : "搜索只看了名称/介绍/标签。";
+    btn.textContent = "在所有 SKILL.md 正文里找";
+  }
+  btn.disabled = OFFLINE || !S.q.trim();
+}
+function renderTree() {
+  var h = ['<div class="node' + (S.filterCat === "" ? " on" : "") + '" data-c="">',
+    '<span class="dot"></span><span class="nm">全部</span>',
+    '<span class="ct">' + S.skills.length + "</span></div>"];
+  h.push('<div class="node' + (S.filterCat === "__star" ? " on" : "") + '" data-c="__star">',
+    '<span class="dot"></span><span class="nm">★ 收藏</span>',
+    '<span class="ct">' + S.skills.filter(function (s) { return s.starred; }).length + "</span></div>");
+  h.push('<div class="node' + (S.filterCat === "__unused" ? " on" : "") + '" data-c="__unused">',
+    '<span class="dot"></span><span class="nm">未使用</span>',
+    '<span class="ct">' + S.skills.filter(function (s) { return !(s.usedBy || []).length; }).length + "</span></div>");
+  h.push('<div class="side-h">分类树</div>');
+  S.cats.forEach(function (c) {
+    var name = c.name;
+    var on = S.filterCat === name ? " on" : "";
+    var ct = S.counts[name] || 0;
+    h.push('<div class="node' + on + '" data-c="' + esc(name) + '">',
+      '<span class="dot"></span><span class="nm" title="' + esc(name) + " " + esc(c.desc || "") + '">' + esc(name) + "</span>",
+      '<span class="ct">' + ct + "</span></div>");
+    (c.children || []).forEach(function (k) {
+      var full = name + "/" + k.name;
+      var on2 = S.filterCat === full ? " on" : "";
+      var ct2 = S.leaf[full] || 0;
+      h.push('<div class="node lv2' + on2 + '" data-c="' + esc(full) + '">',
+        '<span class="dot"></span><span class="nm" title="' + esc(full) + '">' + esc(k.name) + "</span>",
+        '<span class="ct">' + ct2 + "</span></div>");
+    });
+  });
+  $("tree").innerHTML = h.join("");
+}
+function renderGrid() {
+  var list = filtered();
+  var bar = $("bar"), has = S.sel.size > 0;
+  bar.className = has ? "has-sel" : "";
+  bar.querySelector(".sel .n").textContent = S.sel.size;
+
+  var title = S.filterCat === "__star" ? "★ 收藏"
+    : S.filterCat === "__unused" ? "未使用"
+      : (S.filterCat || "全部");
+  $("bTitle").innerHTML = "<b>" + esc(title) + "</b>";
+  $("bCount").textContent = "　" + list.length + " / " + S.skills.length + " 个"
+    + (S.q ? "　（搜索：" + S.q + "）" : "");
+
+  if (!list.length) {
+    $("grid").innerHTML = '<div class="empty">' +
+      (S.skills.length ? "没有符合条件的 Skill。<br>换个分类或清空搜索词试试。"
+        : "技能库还是空的。<br>点右上角 <b>+ 收录</b> 把电脑里已有的 Skill 扫进来。") + "</div>";
+    return;
+  }
+  var words = S.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  var h = list.map(function (s) {
+    var tags = (s.tags || []).slice(0, 5).map(function (t) {
+      return '<span class="tag">#' + esc(t) + "</span>";
+    }).join("");
+    var used = (s.usedBy || []).length;
+    var snippet = "";
+    if (S.bodyHits && S.bodyHits.indexOf(s.id) >= 0 && S.bodySnippets[s.id]) {
+      snippet = '<div class="snippet">正文命中：' + mark(S.bodySnippets[s.id], words) + "</div>";
+    }
+    return '<div class="card' + (S.sel.has(s.id) ? " on" : "") +
+      '" draggable="true" data-id="' + esc(s.id) + '" title="拖到左边分类树上可以改分类">' +
+      '<div class="top">' +
+      '<input type="checkbox" class="pickbox"' + (S.sel.has(s.id) ? " checked" : "") + '>' +
+      '<span class="nm">' + mark(s.name, words) + "</span>" +
+      '<button class="star' + (s.starred ? " on" : "") + '" data-star="' + esc(s.id) + '" title="收藏">' +
+      (s.starred ? "★" : "☆") + "</button></div>" +
+      '<div class="sum">' + mark(s.summary, words) + "</div>" +
+      snippet +
+      (tags ? '<div class="tags">' + tags + "</div>" : "") +
+      '<div class="foot"><span class="cat-chip">' + esc(s.category || "未分类") + "</span>" +
+      '<button class="movebtn" data-move="' + esc(s.id) + '" title="移动到其它分类（手机上用这个）">移动到…</button>' +
+      '<span class="spacer"></span>' +
+      '<span title="' + esc((s.usedBy || []).join("、")) + '">'
+      + (used ? "📁 用在 " + used + " 个项目" : "📁 未使用") + "</span>" +
+      "</div></div>";
+  });
+  $("grid").innerHTML = h.join("");
+}
+function renderAll() { renderTree(); renderFilters(); renderGrid(); }
+
+/* ──────────────────────────────────────────────────────────
+   详情抽屉
+   ────────────────────────────────────────────────────────── */
+function chipsHtml(s) {
+  var h = ['<span class="tag">#' + esc(s.category || "未分类") + "</span>"];
+  (s.tags || []).forEach(function (t) { h.push('<span class="tag">#' + esc(t) + "</span>"); });
+  return h.join("");
+}
+function detailHtml(s, d) {
+  var src = s.sourceType || "-";
+  var used = (s.usedBy || []).length;
+  var h = [];
+  h.push('<div class="btnrow">');
+  h.push('<button class="btn primary" id="dEdit">编辑</button>');
+  h.push('<button class="btn" id="dStar">' + (s.starred ? "取消收藏" : "收藏") + "</button>");
+  h.push('<button class="btn" id="dSend">复制到项目</button>');
+  h.push('<button class="btn danger" id="dDel">删除</button>');
+  h.push("</div>");
+
+  h.push('<div class="sec"><div class="lb">介绍</div><div>' + esc(s.summary || "（没写）") + "</div></div>");
+
+  h.push('<div class="sec"><div class="lb">信息</div><div class="kv">');
+  h.push('<div class="k">id</div><div class="v path">' + esc(s.id) + "</div>");
+  h.push('<div class="k">分类</div><div class="v">' + esc(s.category || "未分类") + "</div>");
+  h.push('<div class="k">来源</div><div class="v">' + esc(src) + "</div>");
+  h.push('<div class="k">原路径</div><div class="v path">' + esc(s.sourcePath || "-") + "</div>");
+  h.push('<div class="k">收录于</div><div class="v">' + esc(s.addedAt || "-") + "</div>");
+  h.push('<div class="k">项目</div><div class="v">' + (used ? esc((s.usedBy || []).join("、")) : "未使用")
+    + (used ? ' <button class="btn tiny" id="dUnsend">从这些项目移除</button>' : "") + "</div>");
+  if (d && d.files) {
+    h.push('<div class="k">文件</div><div class="v path">' +
+      d.files.map(function (f) { return esc(f.name) + " (" + bytes(f.bytes) + ")"; }).join("<br>") + "</div>");
+  }
+  h.push("</div></div>");
+
+  if (d) {
+    h.push('<div class="sec"><div class="lb">SKILL.md 内容</div><div class="md">' + d.html + "</div></div>");
+  } else if (OFFLINE) {
+    h.push('<div class="sec"><div class="lb">SKILL.md 内容</div><div class="empty">离线页面不含正文</div></div>');
+  }
+  return h.join("");
+}
+function openDrawer(id, fromHash) {
+  var s = skillById(id);
+  if (!s) return;
+  S.detail = id;
+  if (!fromHash) writeHash();
+  $("dTitle").textContent = s.name;
+  $("dChips").innerHTML = chipsHtml(s);
+  $("dbody").innerHTML = '<div class="empty">正在读取…</div>';
+  $("drawer").className = "on";
+  $("mask").className = "on";
+
+  var fill = function (d) { $("dbody").innerHTML = detailHtml(s, d); };
+  if (OFFLINE) {
+    var boot = BOOT && BOOT.details ? BOOT.details[id] : null;
+    fill(boot || null);
+    return;
+  }
+  api("GET", "/api/skill/" + encodeURIComponent(id)).then(function (d) {
+    if (S.detail !== id) return;
+    fill(d);
+  }).catch(function (e) {
+    $("dbody").innerHTML = '<div class="empty err">读取失败：' + esc(e.message) + "</div>";
+  });
+}
+function closeDrawer(fromHash) {
+  S.detail = null;
+  $("drawer").className = "";
+  $("mask").className = "";
+  if (!fromHash) writeHash();
+}
+/* ──────────────────────────────────────────────────────────
+   地址栏（筛选状态 + 详情深链都放这里，刷新不丢）
+   格式：#/skill/<id>?c=<分类>&t=<标签,标签>&src=<来源>&star=1&unused=1&q=<搜索词>
+        #/skill/<id>            —— 只开抽屉（老的深链照样能用）
+        #?c=信息对抗/侦察测绘    —— 只有筛选，没有抽屉
+   筛选变了用 replaceState 改写，不往历史里塞记录（否则点十次筛选后退键要按十次）。
+   ────────────────────────────────────────────────────────── */
+function hashQuery() {
+  var p = [];
+  if (S.filterCat && S.filterCat !== "__star" && S.filterCat !== "__unused") {
+    p.push("c=" + encodeURIComponent(S.filterCat));
+  }
+  if (S.tags.length) p.push("t=" + encodeURIComponent(S.tags.join(",")));
+  if (S.source) p.push("src=" + encodeURIComponent(S.source));
+  if (S.onlyStar) p.push("star=1");
+  if (S.onlyUnused) p.push("unused=1");
+  if (S.q) p.push("q=" + encodeURIComponent(S.q));
+  return p.join("&");
+}
+function buildHash() {
+  var query = hashQuery();
+  var head = S.detail ? "#/skill/" + encodeURIComponent(S.detail) : "#";
+  return query ? head + "?" + query : head;
+}
+function writeHash() {
+  var next = buildHash();
+  var cur = location.hash || "#";
+  if (cur === next) return;
+  if (S.detail) location.hash = next;          /* 抽屉：留一条历史，后退能关 */
+  else history.replaceState(null, "", location.pathname + location.search + next);
+}
+function applyHash() {
+  var raw = location.hash.replace(/^#/, "");
+  var qi = raw.indexOf("?");
+  var path = qi < 0 ? raw : raw.slice(0, qi);
+  var query = qi < 0 ? "" : raw.slice(qi + 1);
+  var want = {}, qs = query.split("&");
+  for (var i = 0; i < qs.length; i++) {
+    if (!qs[i]) continue;
+    var eq = qs[i].indexOf("=");
+    want[decodeURIComponent(eq < 0 ? qs[i] : qs[i].slice(0, eq))] =
+      eq < 0 ? "" : decodeURIComponent(qs[i].slice(eq + 1).replace(/\+/g, " "));
+  }
+  var changed = false;
+  function set(key, val) { if (S[key] !== val) { S[key] = val; changed = true; } }
+  set("filterCat", want.c || "");
+  set("tags", want.t ? want.t.split(",").filter(Boolean) : []);
+  set("source", want.src || "");
+  set("onlyStar", want.star === "1");
+  set("onlyUnused", want.unused === "1");
+  set("q", want.q || "");
+  if (S.q !== ($("search").value || "")) $("search").value = S.q;
+  /* 正文搜索结果不在 URL 里：换机器/过一天再打开，这个索引不该被当成筛选条件 */
+  if (S.bodyQuery && S.bodyQuery !== S.q.trim()) {
+    S.bodyHits = null; S.bodySnippets = {}; S.bodyQuery = "";
+  }
+  var m = /^\/skill\/(.+)$/.exec(path);
+  var id = m ? decodeURIComponent(m[1]) : null;
+  if (id && S.detail !== id) { openDrawer(id, true); changed = false; }
+  else if (!id && S.detail) { closeDrawer(true); changed = false; }
+  if (changed) renderAll();
+}
+window.addEventListener("hashchange", applyHash);
+
+/* ──────────────────────────────────────────────────────────
+   弹窗
+   ────────────────────────────────────────────────────────── */
+function openModal(id) { $(id).className = "modal on"; }
+function closeModal(id) { $(id).className = "modal"; }
+document.addEventListener("click", function (e) {
+  var c = e.target.closest("[data-close]");
+  if (c) { var m = c.closest(".modal"); if (m) m.className = "modal"; }
+});
+$("mask").addEventListener("click", closeDrawer);
+$("dclose").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", function (e) {
+  if (e.key !== "Escape") return;
+  var open = document.querySelector(".modal.on");
+  if (open) { open.className = "modal"; return; }
+  closeDrawer();
+});
+
+/* ── 新建 ── */
+$("bNew").addEventListener("click", function () {
+  $("nName").value = ""; $("nSum").value = ""; $("nBody").value = "";
+  $("nCat").innerHTML = catOptions();
+  $("nMsg").textContent = "";
+  openModal("mNew");
+  $("nName").focus();
+});
+$("nOk").addEventListener("click", function () {
+  var name = $("nName").value.trim(), body = $("nBody").value;
+  if (!name) { $("nMsg").innerHTML = '<span class="err">请填名称</span>'; return; }
+  if (!body.trim()) { $("nMsg").innerHTML = '<span class="err">请填内容</span>'; return; }
+  $("nOk").disabled = true;
+  api("POST", "/api/skill/text", {
+    name: name, summary: $("nSum").value.trim(),
+    content: body, category: $("nCat").value
+  }).then(function (d) {
+    closeModal("mNew");
+    toast("已创建：" + d.record.name);
+    return reload();
+  }).then(function () {
+    openDrawer(d0(d));
+  }).catch(function (e) {
+    $("nMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  }).then(function () { $("nOk").disabled = false; });
+});
+function d0(d) { return d.record.id; }
+
+/* ── 收录（扫描） ── */
+$("bCollect").addEventListener("click", function () {
+  if (OFFLINE) { toast("离线页面不能收录", true); return; }
+  $("sBody").innerHTML = '<div class="empty">正在扫描…</div>';
+  $("sMsg").textContent = "";
+  $("sOk").disabled = true;
+  openModal("mScan");
+  api("GET", "/api/scan/preview").then(function (d) {
+    if (!d.pending.length) {
+      $("sBody").innerHTML = '<div class="empty">没有发现新的 Skill。<br>' +
+        "已收录 " + d.alreadyCount + " 个，缺 " + d.missingRoots.length + " 个扫描位置。" +
+        (d.missingRoots.length ? "<br><small>缺的位置：<br>" + d.missingRoots.map(esc).join("<br>") + "</small>" : "") +
+        (d.errors.length ? "<br><span class='err'>" + d.errors.map(esc).join("<br>") + "</span>" : "") +
+        "</div>";
+      return;
+    }
+    var h = ['<div class="hint">共读到 ' + d.fileTotal + " 个 SKILL.md（" + d.pending.length +
+      " 个未收录" + (d.dupCount ? "，其中 " + d.dupCount + " 个在多处重复" : "") +
+      "）。勾选后点下面的按钮：</div>"];
+    h.push('<div class="btnrow"><button class="btn" id="sAll">全选</button>' +
+      '<button class="btn" id="sNone">全不选</button></div>');
+    d.pending.forEach(function (c) {
+      h.push('<label class="pick"><input type="checkbox" class="spick" value="' + esc(c.path) + '" checked>' +
+        '<span class="t"><b>' + esc(c.name || c.id) + "</b>" +
+        '<small>' + esc(c.path) + "</small></span></label>");
+    });
+    $("sBody").innerHTML = h.join("");
+    $("sOk").disabled = false;
+    $("sAll").onclick = function () {
+      document.querySelectorAll(".spick").forEach(function (c) { c.checked = true; });
+    };
+    $("sNone").onclick = function () {
+      document.querySelectorAll(".spick").forEach(function (c) { c.checked = false; });
+    };
+  }).catch(function (e) {
+    $("sBody").innerHTML = '<div class="empty err">' + esc(e.message) + "</div>";
+  });
+});
+$("sOk").addEventListener("click", function () {
+  var paths = Array.prototype.slice.call(document.querySelectorAll(".spick:checked"))
+    .map(function (c) { return c.value; });
+  if (!paths.length) { $("sMsg").innerHTML = '<span class="err">一个都没勾</span>'; return; }
+  $("sOk").disabled = true;
+  $("sMsg").textContent = "正在收录…";
+  api("POST", "/api/collect", { paths: paths }).then(function (d) {
+    closeModal("mScan");
+    toast("收录 " + d.added.length + " 个"
+      + (d.skipped.length ? "，跳过 " + d.skipped.length + " 个" : "")
+      + (d.failed.length ? "，失败 " + d.failed.length + " 个" : ""));
+    reload();
+  }).catch(function (e) {
+    $("sMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  }).then(function () { $("sOk").disabled = false; });
+});
+
+/* ── 编辑 ── */
+function openEdit(id) {
+  var s = skillById(id);
+  if (!s) return;
+  S.editing = id;
+  $("eName").value = s.name;
+  $("eSum").value = s.summary || "";
+  $("eTags").value = (s.tags || []).join(", ");
+  $("eStar").checked = !!s.starred;
+  $("eCat").innerHTML = catOptions();
+  $("eCat").value = s.category || "";
+  $("eMsg").textContent = "";
+  openModal("mEdit");
+}
+$("eOk").addEventListener("click", function () {
+  var body = {
+    name: $("eName").value.trim(),
+    summary: $("eSum").value.trim(),
+    category: $("eCat").value || "未分类",
+    tags: $("eTags").value.split(/[,，]/).map(function (x) { return x.trim(); })
+      .filter(function (x) { return x; }),
+    starred: $("eStar").checked
+  };
+  $("eOk").disabled = true;
+  api("PUT", "/api/skill/" + encodeURIComponent(S.editing), body).then(function () {
+    closeModal("mEdit");
+    toast("已保存");
+    return reload();
+  }).then(function () {
+    if (S.detail) openDrawer(S.detail);
+  }).catch(function (e) {
+    $("eMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  }).then(function () { $("eOk").disabled = false; });
+});
+
+/* ──────────────────────────────────────────────────────────
+   AI 自动分类
+   模型只给建议 → 逐条可改 → 确认后才落盘（和「复制到项目」一个思路：
+   凡是模型/脚本要替你改数据的地方，都得先给你看一眼）
+   ────────────────────────────────────────────────────────── */
+function openClassify(all) {
+  if (OFFLINE) { toast("离线页面不能调 AI", true); return; }
+  S.aiItems = [];
+  $("aiApply").disabled = true;
+  $("aiMsg").textContent = "";
+  $("aiMsg2").textContent = "";
+  openModal("mAi");
+  classifyPreview(!!all);
+}
+function catOptionsFor(current) {
+  var out = ['<option value="">（不改）</option>'];
+  S.cats.forEach(function (c) {
+    var n = esc(c.name);
+    out.push('<option value="' + n + '">' + n + "</option>");
+    (c.children || []).forEach(function (k) {
+      out.push('<option value="' + n + "/" + esc(k.name) + '">' + n + " / " + esc(k.name) + "</option>");
+    });
+  });
+  var custom = '<option value="__new__">＋ 新建一级分类…</option>';
+  S.cats.forEach(function (c) {
+    custom += '<option value="__new__|' + esc(c.name) + '">＋ 在 ' + esc(c.name) + " 下新建…</option>";
+  });
+  out.push(custom);
+  if (current && out.join("").indexOf('value="' + current + '"') < 0) {
+    out.push('<option value="' + esc(current) + '">' + esc(current) + "（AI 新建）</option>");
+  }
+  return out.join("");
+}
+function classifyPreview(all) {
+  $("aiOut").innerHTML = '<div class="empty">正在问模型…<br><small>一个 Skill 一次请求，'
+    + '越多越慢；建议先只跑未分类的前 20 个看看效果。</small></div>';
+  $("aiMsg").textContent = "请求中…";
+  api("POST", "/api/classify/preview", {
+    all: !!all, limit: $("aiLimitOn").checked ? 20 : 0
+  }).then(function (d) {
+    $("aiMsg").textContent = "";
+    S.aiItems = d.items || [];
+    if (d.message) {
+      $("aiOut").innerHTML = '<div class="empty">' + esc(d.message) + "</div>";
+      return;
+    }
+    var good = S.aiItems.filter(function (x) { return !x.error; }).length;
+    $("aiMsg").innerHTML = "共 " + S.aiItems.length + " 个，建议 " + good + " 个，失败 "
+      + (S.aiItems.length - good) + " 个　<span class='dim'>模型：" + esc(d.model || "-") + "</span>";
+    $("aiOut").innerHTML = S.aiItems.map(function (it) {
+      if (it.error) {
+        return '<div class="issue bad"><b>失败</b> ' + esc(it.id) + "：" + esc(it.error) + "</div>";
+      }
+      var opts = catOptionsFor(it.category).replace(
+        'value="' + it.category + '"', 'value="' + it.category + '" selected');
+      return '<div class="proj-row"><div class="pr-main">'
+        + '<b>' + esc(it.id) + "</b>"
+        + '<small>' + (it.newCategory
+          ? '<span class="warn">建议新建：' + esc(it.category) + "</span>" : esc(it.category))
+        + (it.reason ? "　" + esc(it.reason) : "") + "</small></div>"
+        + '<div class="pr-act"><select class="aicat" data-id="' + esc(it.id) + '">'
+        + opts + "</select></div></div>";
+    }).join("");
+    bindCatPickers();
+    $("aiApply").disabled = good === 0;
+  }).catch(function (e) {
+    $("aiMsg").textContent = "";
+    $("aiOut").innerHTML = '<div class="empty err">' + esc(e.message) + "</div>";
+  });
+}
+function bindCatPickers() {
+  Array.prototype.forEach.call(document.querySelectorAll(".aicat"), function (sel) {
+    sel.addEventListener("change", function () {
+      var id = sel.getAttribute("data-id");
+      var item = (S.aiItems || []).filter(function (x) { return x.id === id; })[0];
+      if (!item) return;
+      var v = sel.value;
+      if (v === "") { item.category = ""; return; }
+      if (v === "__new__") {
+        var name = prompt("新分类的名字（一级）：");
+        if (!name) { sel.value = item.category; return; }
+        item.category = name.trim();
+        item.newCategory = true;
+      } else if (v.indexOf("__new__|") === 0) {
+        var parent = v.slice(7);
+        var sub = prompt("在「" + parent + "」下新建哪个二级分类？");
+        if (!sub) { sel.value = item.category; return; }
+        item.category = parent + "/" + sub.trim();
+        item.newCategory = true;
+      } else {
+        item.category = v;
+        item.newCategory = false;
+      }
+    });
+  });
+}
+$("aiScopeUncat").addEventListener("click", function () { classifyPreview(false); });
+$("bAi").addEventListener("click", function () { openClassify(false); });
+$("aiScopeAll").addEventListener("click", function () {
+  if (!confirm("全部重新提建议会覆盖已有的分类安排（只是建议，实际还要你点确认）。继续？")) return;
+  classifyPreview(true);
+});
+$("aiApply").addEventListener("click", function () {
+  var items = (S.aiItems || []).filter(function (x) { return !x.error && x.category; });
+  if (!items.length) { toast("没有可应用的建议", true); return; }
+  var news = items.filter(function (x) { return x.newCategory; });
+  var msg = "把 " + items.length + " 个 Skill 按当前建议归类？";
+  if (news.length) {
+    msg += "\n\n会新建 " + news.length + " 个分类：\n"
+      + news.map(function (x) { return "  " + x.category; }).join("\n");
+  }
+  if (!confirm(msg)) return;
+  $("aiApply").disabled = true;
+  $("aiMsg2").textContent = "正在写入…";
+  api("POST", "/api/classify/apply", { items: items }).then(function (d) {
+    closeModal("mAi");
+    toast("已归类 " + d.applied.length + " 个"
+      + (d.created.length ? "，新建分类 " + d.created.length + " 个" : "")
+      + (d.failed.length ? "，失败 " + d.failed.length + " 个" : ""),
+      !!d.failed.length);
+    return reload();
+  }).catch(function (e) {
+    $("aiMsg2").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  }).then(function () { $("aiApply").disabled = false; });
+});
+
+/* ── 备份 / 体检 / 回收站（第五步） ── */
+var LEVEL_CLASS = { "错误": "bad", "警告": "warn", "提示": "dim" };
+function openTools() {
+  if (OFFLINE) { toast("离线页面不能备份", true); return; }
+  $("tOut").innerHTML = '<div class="empty">点「体检」看看数据有没有毛病，'
+    + '点「全库检查」看依赖和长期未用的 Skill。</div>';
+  $("tFix").disabled = true;
+  openModal("mTools");
+  loadTrash();
+}
+function loadTrash() {
+  return api("GET", "/api/trash").then(function (d) {
+    var items = d.items || [];
+    $("tTrash").innerHTML = items.length ? items.map(function (it) {
+      return '<div class="proj-row"><div class="pr-main"><b>' + esc(it.name || it.id) + "</b>"
+        + '<small>' + esc(it.id) + " · " + esc(it.category || "未分类") + " · "
+        + esc(it.trashedAt || "") + " · " + bytes(it.size || 0)
+        + (it.exists ? "" : " · 文件夹不见了") + "</small></div>"
+        + '<div class="pr-act">' + (it.exists
+          ? '<button class="btn tiny" data-restore="' + esc(it.id) + '">找回</button>' : "")
+        + "</div></div>";
+    }).join("") : '<div class="empty">回收站是空的。</div>';
+  }).catch(function (e) { toast(e.message, true); });
+}
+$("bTools").addEventListener("click", openTools);
+$("tDoctor").addEventListener("click", function () {
+  $("tOut").innerHTML = '<div class="empty">正在体检…</div>';
+  api("GET", "/api/doctor").then(function (d) {
+    S.doctor = d;
+    if (!d.issues.length) {
+      $("tOut").innerHTML = '<div class="empty">一切正常：清单、文件、分类树、分发记录都对得上。</div>';
+      $("tFix").disabled = true;
+      return;
+    }
+    $("tOut").innerHTML = d.issues.map(function (i) {
+      return '<div class="issue ' + (LEVEL_CLASS[i.level] || "") + '">'
+        + "<b>[" + esc(i.level) + "]</b> " + esc(i.code) + "：" + esc(i.detail)
+        + (i.fixable ? ' <span class="dim">→ ' + esc(i.action) + "</span>" : "")
+        + (i.fixed ? ' <span class="ok">（已修）</span>' : "") + "</div>";
+    }).join("");
+    $("tFix").disabled = !d.issues.some(function (i) { return i.fixable && !i.fixed; });
+  }).catch(function (e) { $("tOut").innerHTML = '<div class="empty err">' + esc(e.message) + "</div>"; });
+});
+$("tFix").addEventListener("click", function () {
+  if (!confirm("自动修复会改技能库的数据（重写 skill.json、清回未分类、重算哈希）。继续？")) return;
+  $("tFix").disabled = true;
+  $("tOut").innerHTML = '<div class="empty">正在修…</div>';
+  api("POST", "/api/doctor", { fix: true }).then(function (d) {
+    toast("修好了 " + d.fixed + " 条");
+    return api("GET", "/api/doctor");
+  }).then(function (d) {
+    S.doctor = d;
+    $("tOut").innerHTML = d.issues.length ? d.issues.map(function (i) {
+      return '<div class="issue ' + (LEVEL_CLASS[i.level] || "") + '">'
+        + "<b>[" + esc(i.level) + "]</b> " + esc(i.code) + "：" + esc(i.detail)
+        + (i.fixed ? ' <span class="ok">（已修）</span>' : "") + "</div>";
+    }).join("") : '<div class="empty">现在全部对上了。</div>';
+    $("tFix").disabled = true;
+    return reload();
+  }).catch(function (e) { $("tMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>"; });
+});
+$("tCheck").addEventListener("click", function () {
+  $("tOut").innerHTML = '<div class="empty">正在扫…</div>';
+  api("GET", "/api/check").then(function (d) {
+    var h = [];
+    h.push("<p><b>依赖缺失</b>（只是提醒，不影响分发）</p>");
+    h.push(d.needs.length ? "<ul>" + d.needs.map(function (x) {
+      return "<li>" + esc(x.id) + " 需要 " + esc(x.missing.join("、")) + "</li>";
+    }).join("") + "</ul>" : '<p class="dim">没有 Skill 声明的外部依赖是缺的</p>');
+    h.push("<p><b>依赖指向了不存在的 Skill</b>（这个是真问题）</p>");
+    h.push(d.dangling.length ? '<ul class="bad">' + d.dangling.map(function (x) {
+      return "<li>" + esc(x.id) + " 依赖 " + esc(x.dependsOn) + "</li>";
+    }).join("") + "</ul>" : '<p class="dim">依赖关系都能对上</p>');
+    h.push("<p><b>长期未用</b>（超过 " + d.unusedDays + " 天、没被任何项目用）</p>");
+    h.push(d.unused.length ? "<ul>" + d.unused.slice(0, 30).map(function (x) {
+      return "<li>" + esc(x.id) + " · " + x.days + " 天</li>";
+    }).join("") + "</ul>" : '<p class="dim">没有长期未用的 Skill</p>');
+    h.push("<p><b>空分类</b></p>");
+    h.push(d.emptyCategories.length ? '<p class="dim">' + esc(d.emptyCategories.join("、"))
+      + "</p>" : '<p class="dim">没有空分类</p>');
+    if (d.uncategorized) h.push('<p class="warn">「未分类」里堆了 ' + d.uncategorized + " 个</p>");
+    $("tOut").innerHTML = h.join("");
+  }).catch(function (e) { $("tOut").innerHTML = '<div class="empty err">' + esc(e.message) + "</div>"; });
+});
+$("tTrash").addEventListener("click", function (e) {
+  var btn = e.target.closest("[data-restore]");
+  if (!btn) return;
+  var id = btn.getAttribute("data-restore");
+  btn.disabled = true;
+  api("POST", "/api/restore", { id: id }).then(function (d) {
+    toast("已找回：" + d.id);
+    return Promise.all([loadTrash(), reload()]);
+  }).catch(function (err) { toast(err.message, true); btn.disabled = false; });
+});
+
+/* ──────────────────────────────────────────────────────────
+   复制到项目（第四步）
+   ────────────────────────────────────────────────────────── */
+var SEND_ACT = {
+  add: ["新增", "ok"], same: ["已一致", "dim"], overwrite: ["覆盖旧版", "warn"],
+  relink: ["重建链接", "warn"]
+};
+function openSend(ids) {
+  if (OFFLINE) { toast("离线页面不能分发", true); return; }
+  S.sending = (ids || []).slice();
+  if (!S.sending.length) { toast("先勾选要分发的 Skill", true); return; }
+  $("sdMsg").textContent = "";
+  openModal("mSend");
+  api("GET", "/api/projects").then(function (d) {
+    S.projects = d.projects || [];
+    var sel = $("sdProj");
+    if (!S.projects.length) {
+      sel.innerHTML = '<option value="">（还没登记项目）</option>';
+      $("sdList").innerHTML = '<div class="empty">先在「项目」里登记一个项目文件夹，'
+        + '登记完就能把选中的 Skill 复制过去。</div>';
+      $("sdOk").disabled = true;
+      $("sdHint").textContent = "";
+      return;
+    }
+    $("sdOk").disabled = false;
+    sel.innerHTML = S.projects.map(function (p) {
+      return '<option value="' + esc(p.name) + '">' + esc(p.name) + "（已装 "
+        + p.installed.length + " 个）</option>";
+    }).join("");
+    return previewSend();
+  }).catch(function (e) { $("sdMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>"; });
+}
+function previewSend() {
+  var project = $("sdProj").value;
+  if (!project) return;
+  $("sdHint").textContent = "正在核对…";
+  return api("GET", "/api/send/preview?project=" + encodeURIComponent(project)
+    + "&mode=" + encodeURIComponent($("sdMode").value)
+    + "&ids=" + encodeURIComponent(S.sending.join(",")))
+    .then(function (d) {
+      $("sdHint").textContent = "落点：" + d.root;
+      $("sdList").innerHTML = '<table class="kv"><div class="k">Skill</div><div class="v">会怎么做</div>'
+        + d.plan.map(function (p) {
+          var label = SEND_ACT[p.action] || [p.action, ""];
+          var note = p.via ? '<span class="dim">（因依赖 ' + esc(p.via) + " 被带进来）</span>"
+            : (p.missing && p.missing.length
+              ? ' <span class="warn">缺 ' + esc(p.missing.join("、")) + "</span>" : "");
+          return '<div class="k">' + esc(p.id) + '</div><div class="v">'
+            + '<span class="' + label[1] + '">' + label[0] + "</span>" + note + "</div>";
+        }).join("") + "</table>";
+    }).catch(function (e) {
+      $("sdList").innerHTML = '<div class="empty err">' + esc(e.message) + "</div>";
+    });
+}
+$("sdProj").addEventListener("change", previewSend);
+$("sdMode").addEventListener("change", previewSend);
+$("sdOk").addEventListener("click", function () {
+  var project = $("sdProj").value;
+  if (!project || !S.sending.length) return;
+  $("sdOk").disabled = true;
+  $("sdMsg").textContent = "正在复制…";
+  api("POST", "/api/send", {
+    project: project, ids: S.sending, mode: $("sdMode").value,
+    overwrite: $("sdOver").value
+  }).then(function (d) {
+    closeModal("mSend");
+    var added = (d.added || []).length + (d.relinked || []).length;
+    toast("已复制 " + added + " 个到 " + project
+      + (d.updated && d.updated.length ? "，覆盖 " + d.updated.length + " 个" : "")
+      + (d.skipped && d.skipped.length ? "，跳过 " + d.skipped.length + " 个" : "")
+      + (d.failed && d.failed.length ? "，失败 " + d.failed.length + " 个" : ""),
+      !!(d.failed && d.failed.length));
+    S.sending = [];
+    return reload();
+  }).catch(function (e) {
+    $("sdMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  }).then(function () { $("sdOk").disabled = false; });
+});
+$("bBulkSend").addEventListener("click", function () { openSend(Array.from(S.sel)); });
+
+/* ── 项目管理 ── */
+function openProjects() {
+  if (OFFLINE) { toast("离线页面没有项目功能", true); return; }
+  $("pjMsg").textContent = "";
+  openModal("mProj");
+  loadProjects();
+}
+function loadProjects() {
+  return api("GET", "/api/projects").then(function (d) {
+    S.projects = d.projects || [];
+    if (!S.projects.length) {
+      $("pjList").innerHTML = '<div class="empty">还没有项目。填上面两项登记一个，'
+        + "之后就能把 Skill 批量复制过去。</div>";
+      return;
+    }
+    $("pjList").innerHTML = S.projects.map(function (p) {
+      return '<div class="proj-row"><div class="pr-main"><b>' + esc(p.name) + "</b>"
+        + '<small class="path">' + esc(p.path) + "</small>"
+        + '<small>' + (p.exists ? "已装 " + p.installed.length + " 个 Skill" : "路径不存在")
+        + (p.installed.length ? "：" + esc(p.installed.join("、")) : "") + "</small></div>"
+        + '<div class="pr-act"><button class="btn tiny" data-pstatus="' + esc(p.name) + '">状态</button>'
+        + '<button class="btn tiny danger" data-pdel="' + esc(p.name) + '">移除登记</button></div></div>';
+    }).join("");
+  }).catch(function (e) { $("pjMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>"; });
+}
+$("bProj").addEventListener("click", openProjects);
+$("pjAdd").addEventListener("click", function () {
+  var name = $("pjName").value.trim(), path = $("pjPath").value.trim();
+  if (!name || !path) { $("pjMsg").innerHTML = '<span class="err">项目名和路径都要填</span>'; return; }
+  $("pjAdd").disabled = true;
+  api("POST", "/api/project", { name: name, path: path }).then(function () {
+    $("pjName").value = ""; $("pjPath").value = "";
+    $("pjMsg").textContent = "已登记 " + name;
+    return loadProjects();
+  }).catch(function (e) {
+    $("pjMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  }).then(function () { $("pjAdd").disabled = false; });
+});
+$("pjList").addEventListener("click", function (e) {
+  var del = e.target.closest("[data-pdel]");
+  if (del) {
+    var name = del.getAttribute("data-pdel");
+    if (!confirm("把项目「" + name + "」从清单里移除？\n\n项目里的文件不会动，"
+      + "分发记录还留在技能库里。")) return;
+    api("DELETE", "/api/project/" + encodeURIComponent(name)).then(function () {
+      toast("已移除登记：" + name);
+      return loadProjects();
+    }).catch(function (err) { toast(err.message, true); });
+    return;
+  }
+  var st = e.target.closest("[data-pstatus]");
+  if (st) showProjectStatus(st.getAttribute("data-pstatus"));
+});
+var STATE_LABEL = {
+  ok: ["一致", "ok"], stale: ["过期（库里更新了）", "warn"],
+  missing: ["项目里的文件没了", "warn"], orphan: ["技能库里已经没有了", "warn"],
+  manual: ["手工放进去的（本工具没装）", "dim"]
+};
+function showProjectStatus(name) {
+  api("GET", "/api/project/status?project=" + encodeURIComponent(name)).then(function (d) {
+    var rows = d.rows || [];
+    $("pjList").innerHTML = '<div class="hint">' + esc(d.path) + " → " + esc(d.root) + "</div>"
+      + (rows.length ? rows.map(function (r) {
+        var label = STATE_LABEL[r.state] || [r.state, ""];
+        return '<div class="proj-row"><div class="pr-main"><b>' + esc(r.id) + "</b>"
+          + '<small>' + esc(label[0]) + (r.mode ? " · " + esc(r.mode) : "")
+          + (r.sentAt ? " · " + esc(r.sentAt) : "")
+          + (r.viaDependency ? " · 因依赖 " + esc(r.viaDependency) : "") + "</small></div>"
+          + '<div class="pr-act"><button class="btn tiny danger" data-pdel="' + esc(name) + '">返回</button>'
+          + "</div></div>";
+      }).join("") : '<div class="empty">这个项目里还没有分发过 Skill。</div>')
+      + '<div class="btnrow"><button class="btn" id="pjBack">返回项目列表</button></div>';
+    $("pjBack").onclick = loadProjects;
+  }).catch(function (e) { toast(e.message, true); });
+}
+
+/* ── 移动到（触屏/手机没法拖拽时的等价入口） ── */
+function openMove(id) {
+  /* 已经勾选多个并且点的是其中一张 → 一起移动，和拖拽的行为保持一致 */
+  S.moving = (S.sel.has(id) && S.sel.size > 1) ? Array.from(S.sel) : [id];
+  $("mvCat").innerHTML = catOptions();
+  var cur = skillById(id);
+  $("mvCat").value = cur ? (cur.category || "") : "";
+  $("mvMsg").textContent = S.moving.length > 1
+    ? "将移动 " + S.moving.length + " 个 Skill" : "";
+  openModal("mMove");
+}
+$("mvOk").addEventListener("click", function () {
+  var target = $("mvCat").value || "未分类";
+  var ids = S.moving || [];
+  if (!ids.length) { closeModal("mMove"); return; }
+  $("mvOk").disabled = true;
+  bulkRun(ids, "PUT", { category: target }, "已把 %d 个移到「" + target + "」")
+    .then(function () { S.moving = null; closeModal("mMove"); })
+    .catch(function (err) {
+      $("mvMsg").innerHTML = '<span class="err">' + esc(err.message) + "</span>";
+    })
+    .then(function () { $("mvOk").disabled = false; });
+});
+
+/* ── 加标签 ── */
+$("bBulkTag").addEventListener("click", function () {
+  $("tTags").value = ""; $("tMsg").textContent = "";
+  openModal("mTag");
+});
+$("tOk").addEventListener("click", function () {
+  var tags = $("tTags").value.split(/[,，]/).map(function (x) { return x.trim(); })
+    .filter(function (x) { return x; });
+  if (!tags.length) { $("tMsg").innerHTML = '<span class="err">请填标签</span>'; return; }
+  var ids = Array.from(S.sel);
+  $("tOk").disabled = true;
+  Promise.all(ids.map(function (id) {
+    var s = skillById(id);
+    var merged = (s.tags || []).slice();
+    tags.forEach(function (t) { if (merged.indexOf(t) < 0) merged.push(t); });
+    return api("PUT", "/api/skill/" + encodeURIComponent(id), { tags: merged });
+  })).then(function () {
+    closeModal("mTag");
+    S.sel.clear();
+    toast("已给 " + ids.length + " 个 Skill 加标签");
+    reload();
+  }).catch(function (e) {
+    $("tMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  }).then(function () { $("tOk").disabled = false; });
+});
+
+/* ── 分类管理 ── */
+$("bCat").addEventListener("click", function () {
+  $("cName").value = ""; $("cMsg").textContent = "";
+  var h = ['<option value="">（作为一级分类）</option>'];
+  S.cats.forEach(function (c) {
+    h.push('<option value="' + esc(c.name) + '">' + esc(c.name) + "</option>");
+    (c.children || []).forEach(function (k) {
+      h.push('<option value="' + esc(c.name) + "/" + esc(k.name) + '">' +
+        esc(c.name) + " / " + esc(k.name) + "</option>");
+    });
+  });
+  $("cParent").innerHTML = h.join("");
+  var t = ['<div class="kv">'];
+  S.cats.forEach(function (c) {
+    var ct = S.counts[c.name] || 0;
+    t.push('<div class="k">' + esc(c.name) + "</div>");
+    t.push('<div class="v">' + ct + " 个" +
+      (c.desc ? "　" + esc(c.desc) : "") + "</div>");
+  });
+  t.push("</div>");
+  $("cTree").innerHTML = t.join("");
+  openModal("mCat");
+});
+$("cOk").addEventListener("click", function () {
+  var name = $("cName").value.trim();
+  if (!name) { $("cMsg").innerHTML = '<span class="err">请填名字</span>'; return; }
+  api("POST", "/api/category", { name: name, parent: $("cParent").value }).then(function (d) {
+    $("cName").value = "";
+    toast("已新建：" + d.created);
+    closeModal("mCat");
+    return reload();
+  }).catch(function (e) {
+    $("cMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  });
+});
+
+/* ── 设置 ── */
+$("bSet").addEventListener("click", function () {
+  if (OFFLINE) { toast("离线页面没有设置", true); return; }
+  api("GET", "/api/config").then(function (d) {
+    S.cfg = d.config;
+    $("cfgMsg").textContent = "数据目录：" + d.dataDir;
+    var rows = [];
+    ["scanRoots", "customRoots"].forEach(function (k) {
+      (d.config[k] || []).forEach(function (r) {
+        var path = r.path, on = r.enabled !== false;
+        rows.push('<div class="root-row"><input type="checkbox" class="rt" value="' + esc(path) + '"' +
+          (on ? " checked" : "") + "><span class=\"p\">" + esc(path) + "</span>" +
+          '<small style="color:var(--fg3)">' + esc(r.label || "") + "</small></div>");
+      });
+    });
+    $("cfgRoots").innerHTML = rows.join("") || '<div class="empty">没有扫描位置</div>';
+    $("sRoot").value = "";
+    var ai = d.ai || {};
+    S.ai = ai;
+    $("aiUrl").value = ai.baseUrl || "";
+    $("aiModel").value = ai.model || "";
+    $("aiKey").value = "";
+    $("aiChars").value = ai.bodyChars || 1200;
+    $("aiNew").checked = ai.createCategory !== false;
+    $("aiKeyState").innerHTML = ai.hasKey
+      ? ' <span class="ok">已配置' + (ai.fromEnv ? "（来自环境变量）" : "") + "</span>"
+      : ' <span class="warn">未配置</span>';
+    openModal("mSet");
+  }).catch(function (e) { toast(e.message, true); });
+});
+$("aiTest").addEventListener("click", function () {
+  $("aiTest").disabled = true;
+  $("cfgMsg").textContent = "正在测试…";
+  api("POST", "/api/ai", {
+    baseUrl: $("aiUrl").value.trim(), model: $("aiModel").value.trim(),
+    apiKey: $("aiKey").value.trim(), bodyChars: Number($("aiChars").value) || 1200,
+    createCategory: $("aiNew").checked
+  }).then(function () {
+    return api("POST", "/api/ai/test", {});
+  }).then(function (d) {
+    $("cfgMsg").innerHTML = '<span class="ok">连接正常：' + esc(d.answer) + "</span>";
+    return api("GET", "/api/ai");
+  }).then(function (d) {
+    S.ai = d.ai;
+    $("aiKeyState").innerHTML = d.ai.hasKey
+      ? ' <span class="ok">已配置</span>' : ' <span class="warn">未配置</span>';
+  }).catch(function (e) {
+    $("cfgMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  }).then(function () { $("aiTest").disabled = false; });
+});
+$("cfgOk").addEventListener("click", function () {
+  var roots = Array.prototype.slice.call(document.querySelectorAll(".rt")).map(function (c) {
+    return { path: c.value, enabled: c.checked };
+  });
+  var add = $("sRoot").value.trim();
+  var chain = api("POST", "/api/config/roots", { roots: roots });
+  if (add) chain = chain.then(function () {
+    return api("POST", "/api/config/roots", { roots: [{ path: add, enabled: true }], add: true });
+  });
+  chain.then(function () {
+    closeModal("mSet");
+    toast("已保存");
+  }).catch(function (e) {
+    $("cfgMsg").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+  });
+});
+
+/* ──────────────────────────────────────────────────────────
+   事件绑定
+   ────────────────────────────────────────────────────────── */
+$("search").addEventListener("input", function () {
+  S.q = this.value; renderGrid(); writeHash();
+});
+$("tree").addEventListener("click", function (e) {
+  var n = e.target.closest(".node");
+  if (!n) return;
+  var c = n.getAttribute("data-c");
+  S.filterCat = (c === "" || c === S.filterCat) ? (c === "" ? "" : (S.filterCat === c ? "" : c)) : c;
+  if (n.getAttribute("data-c") === "__star") S.onlyStar = S.filterCat === "__star";
+  else if (S.filterCat !== "__star") S.onlyStar = false;
+  if (S.filterCat === "__unused") S.onlyUnused = true; else S.onlyUnused = false;
+  renderAll(); writeHash();
+});
+$("grid").addEventListener("click", function (e) {
+  var mv = e.target.closest("[data-move]");
+  if (mv) {
+    e.stopPropagation();
+    openMove(mv.getAttribute("data-move"));
+    return;
+  }
+  var st = e.target.closest("[data-star]");
+  if (st) {
+    e.stopPropagation();
+    var id = st.getAttribute("data-star");
+    var s = skillById(id);
+    api("PUT", "/api/skill/" + encodeURIComponent(id), { starred: !s.starred })
+      .then(reload).catch(function (err) { toast(err.message, true); });
+    return;
+  }
+  var card = e.target.closest(".card");
+  if (!card) return;
+  var id2 = card.getAttribute("data-id");
+  if (e.target.classList.contains("pickbox")) {
+    if (S.sel.has(id2)) S.sel.delete(id2); else S.sel.add(id2);
+    card.classList.toggle("on", S.sel.has(id2));
+    $("bar").className = S.sel.size ? "has-sel" : "";
+    $("bar").querySelector(".sel .n").textContent = S.sel.size;
+    return;
+  }
+  openDrawer(id2);
+});
+$("bSelClear").addEventListener("click", function () { S.sel.clear(); renderGrid(); });
+
+/* ──────────────────────────────────────────────────────────
+   批量操作：所有成功才刷新 → 改成部分成功也刷新，并把失败项报出来
+   （原来用 Promise.all，中间失败会静默吞掉，用户以为全改成功了）
+   ────────────────────────────────────────────────────────── */
+function bulkRun(ids, method, body, okText) {
+  if (!ids.length) return Promise.resolve();
+  return Promise.allSettled(ids.map(function (id) {
+    return api(method, "/api/skill/" + encodeURIComponent(id), body);
+  })).then(function (results) {
+    var okIds = [], failed = [];
+    results.forEach(function (r, i) {
+      if (r.status === "fulfilled") okIds.push(ids[i]);
+      else failed.push(ids[i] + "（" + (r.reason && r.reason.message || "未知错误") + "）");
+    });
+    /* 只把成功的从选中里去掉，失败的留着让用户重试 */
+    okIds.forEach(function (id) { S.sel.delete(id); });
+    if (okIds.length) reload();
+    if (!failed.length) {
+      toast(okText.replace("%d", okIds.length));
+    } else {
+      toast("成功 " + okIds.length + " 个，失败 " + failed.length + " 个：" + failed.slice(0, 2).join("；"), true);
+      console.warn("批量操作失败项：", failed);
+    }
+    renderGrid();
+    return { ok: okIds.length, failed: failed };
+  });
+}
+
+$("bulkCat").innerHTML = catOptions();
+$("bBulkCat").addEventListener("click", function () {
+  var target = $("bulkCat").value;
+  if (!target) { toast("先在右边选目标分类", true); return; }
+  bulkRun(Array.from(S.sel), "PUT", { category: target }, "已移动 %d 个");
+});
+$("bBulkStar").addEventListener("click", function () {
+  bulkRun(Array.from(S.sel), "PUT", { starred: true }, "已收藏 %d 个");
+});
+function doDelete(ids) {
+  if (!ids.length) return;
+  if (!confirm("确定删除选中的 " + ids.length + " 个 Skill？\n\n" +
+    "它们会被移到技能库的 _trash 目录，不会真的删掉文件。")) return;
+  Promise.allSettled(ids.map(function (id) {
+    return api("DELETE", "/api/skill/" + encodeURIComponent(id));
+  })).then(function (results) {
+    var ok = 0, failed = [];
+    results.forEach(function (r, i) {
+      if (r.status === "fulfilled") ok++;
+      else failed.push(ids[i]);
+    });
+    S.sel.clear();
+    closeDrawer();
+    if (!failed.length) { toast("已移到 _trash"); reload(); }
+    else { toast("删除成功 " + ok + " 个，失败 " + failed.length + " 个", true); reload(); }
+  });
+}
+$("bBulkDel").addEventListener("click", function () { doDelete(Array.from(S.sel)); });
+
+/* ──────────────────────────────────────────────────────────
+   拖拽改分类（HTML5 原生 draggable）
+   规则：拖的是「勾选中的那一批」，没勾就只拖自己——
+        这样勾 5 个一起拖到「后渗透」就能批量改分类。
+   ────────────────────────────────────────────────────────── */
+function dragTargets(cardId) {
+  if (S.sel.size > 1 && S.sel.has(cardId)) return Array.from(S.sel);
+  return [cardId];
+}
+$("grid").addEventListener("dragstart", function (e) {
+  var card = e.target.closest(".card");
+  if (!card) return;
+  var ids = dragTargets(card.getAttribute("data-id"));
+  S.dragging = ids;
+  card.classList.add("dragging");
+  $("grid").classList.add("dragging-active");
+  try {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", ids.join("\n"));
+  } catch (err) { /* 某些浏览器对自定义类型会抛，忽略 */ }
+});
+$("grid").addEventListener("dragend", function () {
+  S.dragging = null;
+  $("grid").classList.remove("dragging-active");
+  Array.prototype.forEach.call(document.querySelectorAll(".dragging"), function (el) {
+    el.classList.remove("dragging");
+  });
+  Array.prototype.forEach.call(document.querySelectorAll(".node.drop,.node.drop-bad"),
+    function (el) { el.classList.remove("drop", "drop-bad"); });
+});
+$("tree").addEventListener("dragover", function (e) {
+  if (!S.dragging || !S.dragging.length) return;
+  var node = e.target.closest(".node");
+  if (!node) return;
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = "move"; } catch (err) { }
+  var cat = node.getAttribute("data-c");
+  /* 「全部 / 收藏 / 未使用」不是分类节点，不接受投放 */
+  var bad = (cat === "" || cat === "__star" || cat === "__unused");
+  node.classList.toggle("drop", !bad);
+  node.classList.toggle("drop-bad", bad);
+});
+$("tree").addEventListener("dragleave", function (e) {
+  var node = e.target.closest(".node");
+  if (node) node.classList.remove("drop", "drop-bad");
+});
+$("tree").addEventListener("drop", function (e) {
+  var node = e.target.closest(".node");
+  if (!node) return;
+  e.preventDefault();
+  node.classList.remove("drop", "drop-bad");
+  var cat = node.getAttribute("data-c");
+  if (!S.dragging || !S.dragging.length) return;
+  if (cat === "" || cat === "__star" || cat === "__unused") {
+    toast("「全部 / 收藏 / 未使用」不是分类节点，请拖到具体分类上", true);
+    return;
+  }
+  var ids = S.dragging.slice();
+  S.dragging = null;
+  /* 已经在目标分类里的就别发了，省一次写盘 */
+  var moving = ids.filter(function (id) {
+    var s = skillById(id);
+    return s && s.category !== cat;
+  });
+  if (!moving.length) { toast("已经在「" + cat + "」了"); return; }
+  bulkRun(moving, "PUT", { category: cat },
+    "已把 %d 个移到「" + cat + "」").then(function () {
+      /* 拖完把筛选切到目标分类，让用户看到结果 */
+      S.filterCat = cat;
+      renderAll(); writeHash();
+    });
+});
+
+/* ──────────────────────────────────────────────────────────
+   筛选栏交互
+   ────────────────────────────────────────────────────────── */
+$("filters").addEventListener("click", function (e) {
+  var tag = e.target.closest("[data-tag]");
+  if (tag) {
+    var name = tag.getAttribute("data-tag");
+    var at = S.tags.indexOf(name);
+    if (at >= 0) S.tags.splice(at, 1); else S.tags.push(name);
+    renderAll(); writeHash();
+    return;
+  }
+  var src = e.target.closest("[data-src]");
+  if (src) { S.source = src.getAttribute("data-src"); renderAll(); writeHash(); }
+});
+$("fUnused").addEventListener("change", function () {
+  S.onlyUnused = this.checked; renderAll(); writeHash();
+});
+$("fStar").addEventListener("change", function () {
+  S.onlyStar = this.checked;
+  if (S.onlyStar && S.filterCat === "__star") S.filterCat = "";
+  renderAll(); writeHash();
+});
+$("fClear").addEventListener("click", function () {
+  S.filterCat = ""; S.q = ""; S.tags = []; S.source = "";
+  S.onlyStar = false; S.onlyUnused = false;
+  S.bodyHits = null; S.bodySnippets = {}; S.bodyQuery = "";
+  $("search").value = "";
+  renderAll(); writeHash();
+});
+$("bodyGo").addEventListener("click", function () {
+  var q = S.q.trim();
+  if (!q || OFFLINE) return;
+  $("bodyGo").disabled = true;
+  $("bodyHint").textContent = "正在搜全部 SKILL.md 正文…";
+  api("GET", "/api/search?q=" + encodeURIComponent(q)).then(function (d) {
+    S.bodyHits = d.ids; S.bodySnippets = d.snippets || {}; S.bodyQuery = q;
+    renderAll();
+    toast("正文里额外命中 " + d.ids.length + " 个（扫了 " + d.scanned + " 个，用了 " + d.ms + " ms）");
+  }).catch(function (e) {
+    $("bodyHint").textContent = "正文搜索失败：" + e.message;
+  }).then(function () { $("bodyGo").disabled = false; });
+});
+/* 搜索词变了，之前那次的正文结果就不作数了 */
+$("search").addEventListener("input", function () {
+  S.q = this.value;
+  if (S.bodyQuery && S.bodyQuery !== S.q.trim()) {
+    S.bodyHits = null; S.bodySnippets = {}; S.bodyQuery = "";
+  }
+  renderAll();
+});
+
+/* 键盘快捷键 */
+document.addEventListener("keydown", function (e) {
+  var tag = (e.target.tagName || "").toLowerCase();
+  var typing = tag === "input" || tag === "textarea" || tag === "select";
+  if (typing) return;
+  if (e.key === "/" || e.key === "／") { e.preventDefault(); $("search").focus(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "a" || e.key === "A") {          /* 全选当前列表 */
+    e.preventDefault();
+    filtered().forEach(function (s) { S.sel.add(s.id); });
+    renderGrid();
+    return;
+  }
+  if (e.key === "Escape") { S.sel.clear(); renderGrid(); }
+});
+
+/* 详情抽屉里的按钮（事件委托，因为内容是动态生成的） */
+$("dbody").addEventListener("click", function (e) {
+  if (!S.detail) return;
+  var id = S.detail;
+  if (e.target.id === "dEdit") { openEdit(id); }
+  else if (e.target.id === "dSend") { openSend([id]); }
+  else if (e.target.id === "dStar") {
+    var s = skillById(id);
+    api("PUT", "/api/skill/" + encodeURIComponent(id), { starred: !s.starred })
+      .then(function () { return reload(); })
+      .then(function () { openDrawer(id); })
+      .catch(function (err) { toast(err.message, true); });
+  } else if (e.target.id === "dDel") {
+    doDelete([id]);
+  } else if (e.target.id === "dUnsend") {
+    var used = (skillById(id) || {}).usedBy || [];
+    if (!used.length) return;
+    if (!confirm("把「" + id + "」从项目 " + used.join("、") + " 里移除？\n\n"
+      + "项目里的文件会被删掉，技能库里的本体不受影响。")) return;
+    api("POST", "/api/project/remove", { project: used[0], ids: [id] }).then(function (d) {
+      used.slice(1).forEach(function (p) {
+        api("POST", "/api/project/remove", { project: p, ids: [id] });
+      });
+      toast("已从项目里移除");
+      return reload();
+    }).then(function () { openDrawer(id); })
+      .catch(function (err) { toast(err.message, true); });
+  }
+});
+
+$("grid").addEventListener("dblclick", function (e) {
+  var card = e.target.closest(".card");
+  if (card) openEdit(card.getAttribute("data-id"));
+});
+
+/* ──────────────────────────────────────────────────────────
+   测试钩子：只有网址带 ?skmtest=1 时才会去要 tests/skmtest.js。
+   正常使用时这个条件永远为假，一次网络请求都不会发；
+   测试脚本本身不进发布物（文件不在就 404，页面照常用）。
+   ────────────────────────────────────────────────────────── */
+if (/[?&]skmtest=1/.test(location.search)) {
+  var hook = document.createElement("script");
+  hook.src = "/skmtest.js";
+  document.body.appendChild(hook);
+}
+</script>
+</body>
+</html>

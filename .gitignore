@@ -1,0 +1,41 @@
+# ── 运行时数据（含 API Key、本机路径、收集到的第三方 Skill，不要提交）──
+data/
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── 导出产物 ──
+skills.zip
+skills.html
+*.bak
+*.tmp
+*.log
+catalog.json.tmp
+categories.json.tmp
+projects.json.tmp
+
+# ── 编辑器 / 系统 ──
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── 个人开发记录 ──
+plan.md
+开发日志.md
